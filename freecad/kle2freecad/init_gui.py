@@ -25,8 +25,8 @@ class TestCommand:
         doc.openTransaction("Draw square")
         if not in_edit:
             sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
-        draw_centered_square(sketch, 0, 0, 14, 0.5, True)
-        draw_centered_square(sketch, 16, 16, "K0W", "K0R1", False)
+        draw_centered_square(sketch, 0, 0, 14, 0.5, True) # This creates the K0W parameter at 14mm, and the K0R1 radius at 0.5mm.
+        draw_centered_square(sketch, 0, 0, 19.05, 0, True) # This creates the K1W parameter ar 19.05mm
         doc.commitTransaction()
         doc.recompute()
 
@@ -37,18 +37,26 @@ class TestCommand:
 Gui.addCommand("KLE2FreeCAD", TestCommand())
 
 
-class KLE2FreeCADWorkbench(Gui.Workbench):
-    MenuText = "KLE Plate Generator"
-    ToolTip = "Convert KLE output to a sketch"
-    Icon = os.path.join(ICONS, "kle2sketch.svg")
-
-    def Initialize(self):
-        Gui.addIconPath(ICONS)
-        self.appendToolbar("KLE Plate Generator", ["KLE2FreeCAD"])
-        self.appendMenu("KLE Plate Generator", ["KLE2FreeCAD"])
-
-    def GetClassName(self):
-        return "Gui::PythonWorkbench"
+class _AddToSketchToolbar:
+    def modifyToolBars(self):
+        return [{"append": "KLE2FreeCAD", "toolBar": "Sketcher"}]
 
 
-Gui.addWorkbench(KLE2FreeCADWorkbench())
+Gui.addWorkbenchManipulator(_AddToSketchToolbar())
+
+
+# class KLE2FreeCADWorkbench(Gui.Workbench):
+#     MenuText = "KLE Plate Generator"
+#     ToolTip = "Convert KLE output to a sketch"
+#     Icon = os.path.join(ICONS, "kle2sketch.svg")
+
+#     def Initialize(self):
+#         Gui.addIconPath(ICONS)
+#         self.appendToolbar("KLE Plate Generator", ["KLE2FreeCAD"])
+#         self.appendMenu("KLE Plate Generator", ["KLE2FreeCAD"])
+
+#     def GetClassName(self):
+#         return "Gui::PythonWorkbench"
+
+
+# Gui.addWorkbench(KLE2FreeCADWorkbench())

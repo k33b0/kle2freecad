@@ -22,6 +22,8 @@ def draw_centered_square(sketch, x=0.0, y=0.0, size=14.0, radius=0.0, constructi
         expr = f".Constraints.{size}"
         size = sketch.getDatum(size).Value
     r_expr = None
+    # a radius given as the number 0 means sharp corners: no arcs at all
+    fillet = not (isinstance(radius, (int, float)) and radius == 0)
     if isinstance(radius, str):
         r_expr = f".Constraints.{radius}"
         radius = sketch.getDatum(radius).Value
@@ -37,7 +39,7 @@ def draw_centered_square(sketch, x=0.0, y=0.0, size=14.0, radius=0.0, constructi
     ], construction)
     top, right, bottom, left = lines
 
-    if r:
+    if fillet:
         def quarter_arc(cx, cy, start_angle):  # counterclockwise
             return Part.ArcOfCircle(Part.Circle(V(cx, cy), V(0, 0, 1), r), start_angle, start_angle + math.pi / 2)
 
@@ -99,7 +101,7 @@ def draw_centered_square(sketch, x=0.0, y=0.0, size=14.0, radius=0.0, constructi
         sketch.setExpression(f"Constraints.K{n}W", expr)
     if r_expr:
         sketch.setExpression(f"Constraints.K{n}R1", r_expr)
-    if r:
+    if fillet:
         for i in (2, 3, 4):
             sketch.setExpression(f"Constraints.K{n}R{i}", f".Constraints.K{n}R1")
     return center, lines
