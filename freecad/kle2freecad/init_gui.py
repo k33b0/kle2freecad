@@ -10,12 +10,12 @@ class TestCommand:
     def GetResources(self):
         return {
             "Pixmap": os.path.join(ICONS, "kle2sketch.svg"),
-            "MenuText": "Test",
-            "ToolTip": "Draw a 14 mm square in the open sketch, or in a new sketch",
+            "MenuText": "Plate cutouts",
+            "ToolTip": "Use a KLE json to create a key cutout sketch",
         }
 
     def Activated(self):
-        from .draw import draw_centered_square
+        from .mx_cutouts import draw_centered_square
 
         vp = Gui.ActiveDocument and Gui.ActiveDocument.getInEdit()
         sketch = vp.Object if vp and vp.Object.TypeId == "Sketcher::SketchObject" else None
@@ -34,7 +34,7 @@ class TestCommand:
             Gui.ActiveDocument.setEdit(sketch.Name)
 
 
-Gui.addCommand("KLE2FreeCAD_Test", TestCommand())
+Gui.addCommand("KLE2FreeCAD", TestCommand())
 
 
 class KLE2FreeCADWorkbench(Gui.Workbench):
@@ -44,8 +44,8 @@ class KLE2FreeCADWorkbench(Gui.Workbench):
 
     def Initialize(self):
         Gui.addIconPath(ICONS)
-        self.appendToolbar("KLE Plate Generator", ["KLE2FreeCAD_Test"])
-        self.appendMenu("KLE Plate Generator", ["KLE2FreeCAD_Test"])
+        self.appendToolbar("KLE Plate Generator", ["KLE2FreeCAD"])
+        self.appendMenu("KLE Plate Generator", ["KLE2FreeCAD"])
 
     def GetClassName(self):
         return "Gui::PythonWorkbench"
