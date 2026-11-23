@@ -16,7 +16,11 @@ class TestCommand:
         }
 
     def Activated(self):
+        from .dialog import KLEPromptDialog
         from .mx_cutouts import draw_centered_square
+
+        if not KLEPromptDialog(Gui.getMainWindow()).exec():
+            return  # Cancel
 
         # 2. a sketch is open: append to it
         vp = Gui.ActiveDocument and Gui.ActiveDocument.getInEdit()
