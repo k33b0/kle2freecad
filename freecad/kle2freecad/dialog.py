@@ -1,6 +1,10 @@
+import json
 import os
 
 from PySide import QtCore, QtGui, QtWidgets
+
+from .kle_json_cleaner import normalizeKLEData, sanitizeAsJson
+from .ks_prefs import get_saved_layout, set_saved_layout
 
 Qt = QtCore.Qt
 _ICON_PATH = os.path.join(os.path.dirname(__file__), "resources", "icons", "kle2sketch.svg")
@@ -26,6 +30,7 @@ class KLEPromptDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.setWindowTitle("KLE Sketch Generator")
         self.setWindowIcon(QtGui.QIcon(_ICON_PATH))
+        self.kle_parsed = None
         self._build_ui()
 
     def _build_ui(self):
@@ -43,7 +48,7 @@ class KLEPromptDialog(QtWidgets.QDialog):
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
         )
-        buttons.accepted.connect(self.accept)
+        buttons.accepted.connect(self._handle_ok)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
@@ -57,6 +62,9 @@ class KLEPromptDialog(QtWidgets.QDialog):
         self.kle_text = _TabFriendlyTextEdit()
         self.kle_text.setFont(QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont))
         self.kle_text.setPlaceholderText("Paste KLE JSON...")
+        default_layout = get_saved_layout()
+        if default_layout:
+            self.kle_text.setPlainText(default_layout)
         self.kle_text.setMinimumHeight(140)
 
         v.addWidget(hint)
@@ -149,3 +157,18 @@ class KLEPromptDialog(QtWidgets.QDialog):
         spin.setMaximum(9999.0)
         spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         return spin
+
+    def _handle_ok(self):
+        kle_text = self.kle_text.toPlainText()
+
+        try:
+            kle_payload = sanitizeAsJson(kle_text)
+            kle_json = json.loads(kle_payload)
+            self.kle_parsed = normalizeKLEData(kle_json)
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Invalid KLE data", str(exc) or "Failed to parse KLE input.")
+            return
+
+        # All good, lets carry on
+        set_saved_layout(kle_text)
+        self.accept()

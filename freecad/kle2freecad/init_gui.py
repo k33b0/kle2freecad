@@ -16,11 +16,24 @@ class TestCommand:
         }
 
     def Activated(self):
-        from .dialog import KLEPromptDialog
-        from .mx_cutouts import draw_centered_square
+        import traceback
 
-        if not KLEPromptDialog(Gui.getMainWindow()).exec():
+        from PySide import QtCore, QtWidgets
+
+        from .dialog import KLEPromptDialog
+        from .kle_json_cleaner import countKeys
+        from .ks_draw import CutoutCollector, addCutouts, drawCherryKey, drawCherryStab, findKeyCenters
+
+        dlg = KLEPromptDialog(Gui.getMainWindow())
+        if not dlg.exec():
             return  # Cancel
+
+        adv_w = dlg.adv_w.value()
+        adv_h = dlg.adv_h.value()
+        adv_k = dlg.adv_k.value() # Kerf
+        flt_r = dlg.fillet_rad.value() # Switch fillet radius
+        flt_c = dlg.fillet_cut.value() # Stab fillet radius
+        kle_parsed = findKeyCenters(dlg.kle_parsed, adv_w, adv_h)
 
         # 2. a sketch is open: append to it
         vp = Gui.ActiveDocument and Gui.ActiveDocument.getInEdit()
@@ -58,8 +71,39 @@ class TestCommand:
         elif not in_edit:
             # 3. anything else: a new sketch, as before
             sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
-        draw_centered_square(sketch, 0, 0, 14, 0.5, True) # This creates the K0W parameter at 14mm, and the K0R1 radius at 0.5mm.
-        draw_centered_square(sketch, 0, 0, 19.05, 0, True) # This creates the K1W parameter ar 19.05mm
+        # loop here
+        progress = QtWidgets.QProgressDialog("Drawing key cutouts...", None, 0, countKeys(kle_parsed), Gui.getMainWindow())
+        progress.setWindowTitle("KLE Sketch Generator")
+        progress.setCancelButton(None)
+        progress.setMinimumDuration(0)
+        progress.setWindowModality(QtCore.Qt.WindowModal)
+        progress.forceShow()
+
+        try:
+            cutouts = CutoutCollector()  # collect first, so overlapping cutouts can be merged
+            step = 0
+            for row in kle_parsed or []:
+                if not isinstance(row, list):
+                    continue
+                for item in row:
+                    if isinstance(item, dict):
+                        cx = item.get("cx",0)
+                        cy = item.get("cy",0)
+                        drawCherryKey(cutouts, cx, cy, flt_r, adv_k)
+                        w = item.get("w",1)
+                        h = item.get("h",1)
+                        if w >= 2 or h >= 2:
+                            drawCherryStab(cutouts, cx, cy, w, h, item.get("r",0), flt_c, adv_k)
+                        step += 1
+                    progress.setValue(step)
+                    QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+            addCutouts(sketch, cutouts.loops, max(flt_r, flt_c), cutouts.construction)  # inside corners: the larger radius, so every part fits
+        except Exception as e:
+            print(str(e))
+            traceback.print_exc()
+
+        progress.close()
+        # commit and recompute
         doc.commitTransaction()
         doc.recompute()
 
@@ -76,6 +120,12 @@ class _AddToSketchToolbar:
 
 
 Gui.addWorkbenchManipulator(_AddToSketchToolbar())
+
+
+from .ks_prefs import KSprefsPage  # noqa: E402
+
+Gui.addIconPath(ICONS)  # for the preferences page icon, preferences-kle_plate_generator.svg
+Gui.addPreferencePage(KSprefsPage, "KLE Plate Generator")
 
 
 # class KLE2FreeCADWorkbench(Gui.Workbench):
