@@ -97,7 +97,7 @@ class TestCommand:
                         step += 1
                     progress.setValue(step)
                     QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
-            addCutouts(sketch, cutouts.loops, flt_r)
+            addCutouts(sketch, cutouts.loops, max(flt_r, flt_c), cutouts.construction)  # inside corners: the larger radius, so every part fits
         except Exception as e:
             print(str(e))
             traceback.print_exc()

@@ -172,7 +172,83 @@ def drawCherryStab(sketch, cx, cy, width, height, angle, flt_r, kerf):
         w = 15
         h = 7
 
-    return drawRect(sketch, x1, y1, w, h, flt_r, kerf) & drawRect(sketch, x2, y2, w, h, flt_r, kerf)
+    # quarter turns that point each pad's opposite-side version the right way:
+    # the opposite side is the same pad moved 3 mm, to the other side of the key center line
+    k = {0: 0, 1: 3, 2: 2, 3: 1}[o_r]
+    drawStabPad(sketch, x1, y1, 7, 15, flt_r, k)
+    drawStabPad(sketch, x2, y2, 7, 15, flt_r, k)
+    return True
+
+# ----------------------------------------------------------------------------
+
+def drawStabPad(sketch, x, y, w, h, r, k, shift=3.0):
+    """Draw one stabilizer pad of w x h mm centered on (x, y) as real geometry, plus the
+    pad for the opposite orientation (moved `shift` mm along the pad) as construction
+    geometry. Everything is turned k quarter turns counterclockwise; with k = 0 the
+    opposite pad is above.
+
+    Each side of the pad is two lines: the lower one only this pad uses, the upper one
+    both pads share. So in the Sketcher, with Toggle construction geometry:
+
+    Double-sided, one pad of w x (h + shift) mm that fits both orientations:
+      - real -> construction: the pad's top line and its two top arcs
+      - construction -> real: the two side extensions, and the opposite pad's top line
+        and two top arcs
+
+    Swap to the opposite orientation:
+      - real -> construction: the pad's bottom line, two bottom arcs, two lower side
+        lines, top line and two top arcs
+      - construction -> real: the two side extensions, and the opposite pad's top line,
+        two top arcs, bottom line and two bottom arcs"""
+
+    z = max(w, h) / 2
+    if r > z:
+        r = z
+    a, t = w / 2, h / 2
+
+    def P(px, py):  # local point -> sketch point
+        for _ in range(k):
+            px, py = -py, px
+        return FreeCAD.Vector(x + px, y + py, 0)
+
+    def line(x1, y1, x2, y2):
+        return Part.LineSegment(P(x1, y1), P(x2, y2))
+
+    def arc(acx, acy, start):  # quarter arc, counterclockwise from `start`
+        s = start + k * math.pi / 2
+        return Part.ArcOfCircle(Part.Circle(P(acx, acy), FreeCAD.Vector(0, 0, 1), r), s, s + math.pi / 2)
+
+    real = [
+        line(-a + r, -t, a - r, -t),  # bottom
+        line(a, -t + r, a, -t + shift + r),    # right side, this pad only
+        line(a, -t + shift + r, a, t - r),     # right side, common to both pads
+        line(a - r, t, -a + r, t),             # top, inside the opposite pad
+        line(-a, t - r, -a, -t + shift + r),   # left side, common to both pads
+        line(-a, -t + shift + r, -a, -t + r),  # left side, this pad only
+    ]
+    construction = [
+        line(a, t - r, a, t + shift - r),           # right side extension
+        line(-a, t - r, -a, t + shift - r),         # left side extension
+        line(a - r, t + shift, -a + r, t + shift),  # opposite pad top
+        line(-a + r, -t + shift, a - r, -t + shift),  # opposite pad bottom, a reference only
+    ]
+    if r > 0:
+        real += [
+            arc(a - r, -t + r, 1.5 * math.pi),  # bottom right
+            arc(a - r, t - r, 0),               # top right
+            arc(-a + r, t - r, 0.5 * math.pi),  # top left
+            arc(-a + r, -t + r, math.pi),       # bottom left
+        ]
+        construction += [
+            arc(a - r, t + shift - r, 0),               # opposite pad top right
+            arc(-a + r, t + shift - r, 0.5 * math.pi),  # opposite pad top left
+            arc(-a + r, -t + shift + r, math.pi),       # opposite pad bottom left, a reference only
+            arc(a - r, -t + shift + r, 1.5 * math.pi),  # opposite pad bottom right, a reference only
+        ]
+
+    ids = list(sketch.addGeometry(real, False)) + list(sketch.addGeometry(construction, True))
+    sketch.addConstraint([Sketcher.Constraint('Block', i) for i in ids])
+    return True
 
 # ----------------------------------------------------------------------------
 
@@ -182,9 +258,13 @@ class CutoutCollector:
 
     def __init__(self):
         self.loops = []
+        self.construction = []  # (index of the loop it belongs to, geometry)
 
     def addGeometry(self, geoms, construction=False):
-        self.loops.append(list(geoms))
+        if construction:
+            self.construction.append((len(self.loops) - 1, list(geoms)))
+        else:
+            self.loops.append(list(geoms))
         return list(range(len(geoms)))
 
     def addConstraint(self, constraints):
@@ -206,13 +286,15 @@ def _edgeToGeometry(edge):
 
 # ----------------------------------------------------------------------------
 
-def addCutouts(sketch, loops, radius=0):
+def addCutouts(sketch, loops, radius=0, construction=()):
     """Add the cutout loops to the sketch, each item frozen with a Block constraint.
     Loops that overlap or touch, such as the alternative keys of a multi-layout plate
     (a split Backspace on top of a 2u Backspace), are merged into one outline. If
-    `radius` is not 0, the inside corners of a merged outline are rounded to it."""
+    `radius` is not 0, the inside corners of a merged outline are rounded to it.
+    `construction` holds (loop index, geometry) pairs from CutoutCollector; they are added as
+    construction geometry, but only for loops that were not merged."""
 
-    faces = [Part.Face(Part.Wire([g.toShape() for g in loop])) for loop in loops]
+    faces = [Part.Face(Part.Wire(Part.__sortEdges__([g.toShape() for g in loop]))) for loop in loops]
 
     # group the loops that overlap or touch
     # ponytail: pair scan is O(n^2) with a bounding-box filter; fine for keyboards, use a spatial grid if layouts get much larger
@@ -245,5 +327,10 @@ def addCutouts(sketch, loops, radius=0):
                 merged = Part.Compound(merged.Faces).makeOffset2D(radius, join=0).makeOffset2D(-radius, join=0)
             geoms += [_edgeToGeometry(e) for e in merged.Edges]
 
-    ids = sketch.addGeometry(geoms, False)
+    single = {members[0] for members in groups.values() if len(members) == 1}
+    construction_geoms = [g for i, gs in construction if i in single for g in gs]
+
+    ids = list(sketch.addGeometry(geoms, False))
+    if construction_geoms:
+        ids += list(sketch.addGeometry(construction_geoms, True))
     sketch.addConstraint([Sketcher.Constraint('Block', i) for i in ids])
