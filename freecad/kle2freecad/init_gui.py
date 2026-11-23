@@ -97,7 +97,7 @@ class TestCommand:
                         step += 1
                     progress.setValue(step)
                     QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
-            addCutouts(sketch, cutouts.loops, max(flt_r, flt_c), cutouts.construction)  # inside corners: the larger radius, so every part fits
+            addCutouts(sketch, cutouts.loops, max(flt_r, flt_c) + adv_k / 2, cutouts.construction)  # inside corners: the larger radius, so every part fits; + kerf/2, as the beam shrinks inside corners by that much
         except Exception as e:
             print(str(e))
             traceback.print_exc()
@@ -122,24 +122,24 @@ class _AddToSketchToolbar:
 Gui.addWorkbenchManipulator(_AddToSketchToolbar())
 
 
-from .ks_prefs import KSprefsPage  # noqa: E402
+# from .ks_prefs import KSprefsPage  # noqa: E402
 
-Gui.addIconPath(ICONS)  # for the preferences page icon, preferences-kle_plate_generator.svg
-Gui.addPreferencePage(KSprefsPage, "KLE Plate Generator")
-
-
-# class KLE2FreeCADWorkbench(Gui.Workbench):
-#     MenuText = "KLE Plate Generator"
-#     ToolTip = "Convert KLE output to a sketch"
-#     Icon = os.path.join(ICONS, "kle2sketch.svg")
-
-#     def Initialize(self):
-#         Gui.addIconPath(ICONS)
-#         self.appendToolbar("KLE Plate Generator", ["KLE2FreeCAD"])
-#         self.appendMenu("KLE Plate Generator", ["KLE2FreeCAD"])
-
-#     def GetClassName(self):
-#         return "Gui::PythonWorkbench"
+# Gui.addIconPath(ICONS)  # for the preferences page icon, preferences-kle_plate_generator.svg
+# Gui.addPreferencePage(KSprefsPage, "KLE Plate Generator")
 
 
-# Gui.addWorkbench(KLE2FreeCADWorkbench())
+class KLE2FreeCADWorkbench(Gui.Workbench):
+    MenuText = "KLE Plate Generator"
+    ToolTip = "Convert KLE output to a sketch"
+    Icon = os.path.join(ICONS, "kle2sketch.svg")
+
+    def Initialize(self):
+        Gui.addIconPath(ICONS)
+        self.appendToolbar("KLE Plate Generator", ["KLE2FreeCAD"])
+        self.appendMenu("KLE Plate Generator", ["KLE2FreeCAD"])
+
+    def GetClassName(self):
+        return "Gui::PythonWorkbench"
+
+
+Gui.addWorkbench(KLE2FreeCADWorkbench())

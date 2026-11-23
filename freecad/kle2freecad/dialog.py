@@ -91,13 +91,8 @@ class KLEPromptDialog(QtWidgets.QDialog):
         self.cutout_stab.setEnabled(False)
         form.addRow("Stabilizer Cutout Type", self.cutout_stab)
 
-        self.cutout_acst = QtWidgets.QComboBox()
-        ## TODO: Add support for other Acoustic Cutout types
-        self.cutout_acst.addItem("None")
-        self.cutout_acst.setEnabled(False)
-        form.addRow("Acoustic Cutout Type", self.cutout_acst)
-
         v.addLayout(form)
+        v.addStretch()  # keep the content at the top when the boxes are stretched to the same height
         return box
 
     def _build_fillet_group(self):
@@ -114,10 +109,8 @@ class KLEPromptDialog(QtWidgets.QDialog):
         self.fillet_cut = self._make_spin(0.5)
         form.addRow("Stabilizer Cutout Fillet Radius", self.fillet_cut)
 
-        self.fillet_acst = self._make_spin(0.5, enabled=False)
-        form.addRow("Acoustic Cutout Fillet Radius", self.fillet_acst)
-
         v.addLayout(form)
+        v.addStretch()  # keep the content at the top when the boxes are stretched to the same height
         return box
 
     def _build_advanced_group(self):
@@ -134,10 +127,11 @@ class KLEPromptDialog(QtWidgets.QDialog):
         self.adv_h = self._make_spin(19.05)
         form.addRow("Unit Height", self.adv_h)
 
-        self.adv_k = self._make_spin(0, enabled=False)
+        self.adv_k = self._make_spin(0)
         form.addRow("Kerf", self.adv_k)
 
         v.addLayout(form)
+        v.addStretch()  # keep the content at the top when the boxes are stretched to the same height
         return box
 
     @staticmethod

@@ -15,12 +15,13 @@ def drawRect(sketch, x, y, w, h, r, k):
     if sketch is None:
         return False
 
+    # kerf: the beam burns k/2 off each side, so the cut path is drawn that much smaller
+    w, h, r = w - k, h - k, max(r - k / 2, 0)
+
     lft = x - (w / 2)
     rte = x + (w / 2)
     top = y + (h / 2)
     btm = y - (h / 2)
-
-    # TODO : account for `kerf`
 
     # Batch geometry/constraints to reduce per-call overhead when creating many keys.
     if r > 0:
@@ -175,13 +176,13 @@ def drawCherryStab(sketch, cx, cy, width, height, angle, flt_r, kerf):
     # quarter turns that point each pad's opposite-side version the right way:
     # the opposite side is the same pad moved 3 mm, to the other side of the key center line
     k = {0: 0, 1: 3, 2: 2, 3: 1}[o_r]
-    drawStabPad(sketch, x1, y1, 7, 15, flt_r, k)
-    drawStabPad(sketch, x2, y2, 7, 15, flt_r, k)
+    drawStabPad(sketch, x1, y1, 7, 15, flt_r, k, kerf=kerf)
+    drawStabPad(sketch, x2, y2, 7, 15, flt_r, k, kerf=kerf)
     return True
 
 # ----------------------------------------------------------------------------
 
-def drawStabPad(sketch, x, y, w, h, r, k, shift=3.0):
+def drawStabPad(sketch, x, y, w, h, r, k, shift=3.0, kerf=0):
     """Draw one stabilizer pad of w x h mm centered on (x, y) as real geometry, plus the
     pad for the opposite orientation (moved `shift` mm along the pad) as construction
     geometry. Everything is turned k quarter turns counterclockwise; with k = 0 the
@@ -199,8 +200,12 @@ def drawStabPad(sketch, x, y, w, h, r, k, shift=3.0):
       - real -> construction: the pad's bottom line, two bottom arcs, two lower side
         lines, top line and two top arcs
       - construction -> real: the two side extensions, and the opposite pad's top line,
-        two top arcs, bottom line and two bottom arcs"""
+        two top arcs, bottom line and two bottom arcs
 
+    kerf: the beam burns kerf/2 off each side, so the pad is drawn that much smaller.
+    The shift stays the same."""
+
+    w, h, r = w - kerf, h - kerf, max(r - kerf / 2, 0)
     z = max(w, h) / 2
     if r > z:
         r = z
