@@ -3,7 +3,9 @@
 import FreeCAD
 import FreeCADGui
 from PySide6 import QtGui
-from KSutils import prefFileName
+import os
+
+prefFileName = os.path.join(os.path.dirname(__file__), "resources", "KSprefs.ui")
 
 _PREF_PATH = "User parameter:BaseApp/Preferences/Mod/kle2sketch"
 _PREF_KEY = "LayoutJSON"
