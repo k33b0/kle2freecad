@@ -16,11 +16,31 @@ class TestCommand:
         }
 
     def Activated(self):
+        import json
+
         from .dialog import KLEPromptDialog
+        from .kle_json_cleaner import countCols, countRows, normalizeKLEData, sanitizeAsJson
         from .mx_cutouts import draw_centered_square
 
-        if not KLEPromptDialog(Gui.getMainWindow()).exec():
+        dlg = KLEPromptDialog(Gui.getMainWindow())
+        if not dlg.exec():
             return  # Cancel
+
+        # key centers in mm, found as the old plugin did: the layout is centered on the origin,
+        # and Y is flipped because KLE counts rows downward
+        keys = normalizeKLEData(json.loads(sanitizeAsJson(dlg.kle_text.toPlainText())))
+        left = countCols(keys) / -2
+        top = countRows(keys) / 2
+        centers = [
+            (
+                (left + k.get("x", 0) + k.get("w", 1) / 2) * dlg.adv_w.value(),
+                (top - (k.get("y", 0) + k.get("h", 1) / 2)) * dlg.adv_h.value(),
+            )
+            for row in keys
+            if isinstance(row, list)
+            for k in row
+            if isinstance(k, dict)
+        ]
 
         # 2. a sketch is open: append to it
         vp = Gui.ActiveDocument and Gui.ActiveDocument.getInEdit()
@@ -58,8 +78,14 @@ class TestCommand:
         elif not in_edit:
             # 3. anything else: a new sketch, as before
             sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
+        #draw construction squares here, with known params
         draw_centered_square(sketch, 0, 0, 14, 0.5, True) # This creates the K0W parameter at 14mm, and the K0R1 radius at 0.5mm.
         draw_centered_square(sketch, 0, 0, 19.05, 0, True) # This creates the K1W parameter ar 19.05mm
+        # loop here
+        for x, y in centers:
+            App.Console.PrintMessage(f"Key center: x={x:.3f} y={y:.3f}\n")
+            draw_centered_square(sketch, x, y, "K0W", "K0R1", False)
+        # commit and recompute
         doc.commitTransaction()
         doc.recompute()
 
