@@ -16,31 +16,24 @@ class TestCommand:
         }
 
     def Activated(self):
-        import json
+        import traceback
+
+        from PySide import QtCore, QtWidgets
 
         from .dialog import KLEPromptDialog
-        from .kle_json_cleaner import countCols, countRows, normalizeKLEData, sanitizeAsJson
-        from .mx_cutouts import draw_centered_square
+        from .kle_json_cleaner import countKeys
+        from .ks_draw import CutoutCollector, addCutouts, drawCherryKey, drawCherryStab, findKeyCenters
 
         dlg = KLEPromptDialog(Gui.getMainWindow())
         if not dlg.exec():
             return  # Cancel
 
-        # key centers in mm, found as the old plugin did: the layout is centered on the origin,
-        # and Y is flipped because KLE counts rows downward
-        keys = normalizeKLEData(json.loads(sanitizeAsJson(dlg.kle_text.toPlainText())))
-        left = countCols(keys) / -2
-        top = countRows(keys) / 2
-        centers = [
-            (
-                (left + k.get("x", 0) + k.get("w", 1) / 2) * dlg.adv_w.value(),
-                (top - (k.get("y", 0) + k.get("h", 1) / 2)) * dlg.adv_h.value(),
-            )
-            for row in keys
-            if isinstance(row, list)
-            for k in row
-            if isinstance(k, dict)
-        ]
+        adv_w = dlg.adv_w.value()
+        adv_h = dlg.adv_h.value()
+        adv_k = dlg.adv_k.value() # Kerf
+        flt_r = dlg.fillet_rad.value() # Switch fillet radius
+        flt_c = dlg.fillet_cut.value() # Stab fillet radius
+        kle_parsed = findKeyCenters(dlg.kle_parsed, adv_w, adv_h)
 
         # 2. a sketch is open: append to it
         vp = Gui.ActiveDocument and Gui.ActiveDocument.getInEdit()
@@ -78,13 +71,38 @@ class TestCommand:
         elif not in_edit:
             # 3. anything else: a new sketch, as before
             sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
-        #draw construction squares here, with known params
-        draw_centered_square(sketch, 0, 0, 14, 0.5, True) # This creates the K0W parameter at 14mm, and the K0R1 radius at 0.5mm.
-        draw_centered_square(sketch, 0, 0, 19.05, 0, True) # This creates the K1W parameter ar 19.05mm
         # loop here
-        for x, y in centers:
-            App.Console.PrintMessage(f"Key center: x={x:.3f} y={y:.3f}\n")
-            draw_centered_square(sketch, x, y, "K0W", "K0R1", False)
+        progress = QtWidgets.QProgressDialog("Drawing key cutouts...", None, 0, countKeys(kle_parsed), Gui.getMainWindow())
+        progress.setWindowTitle("KLE Sketch Generator")
+        progress.setCancelButton(None)
+        progress.setMinimumDuration(0)
+        progress.setWindowModality(QtCore.Qt.WindowModal)
+        progress.forceShow()
+
+        try:
+            cutouts = CutoutCollector()  # collect first, so overlapping cutouts can be merged
+            step = 0
+            for row in kle_parsed or []:
+                if not isinstance(row, list):
+                    continue
+                for item in row:
+                    if isinstance(item, dict):
+                        cx = item.get("cx",0)
+                        cy = item.get("cy",0)
+                        drawCherryKey(cutouts, cx, cy, flt_r, adv_k)
+                        w = item.get("w",1)
+                        h = item.get("h",1)
+                        if w >= 2 or h >= 2:
+                            drawCherryStab(cutouts, cx, cy, w, h, item.get("r",0), flt_c, adv_k)
+                        step += 1
+                    progress.setValue(step)
+                    QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+            addCutouts(sketch, cutouts.loops, flt_r)
+        except Exception as e:
+            print(str(e))
+            traceback.print_exc()
+
+        progress.close()
         # commit and recompute
         doc.commitTransaction()
         doc.recompute()
@@ -102,6 +120,12 @@ class _AddToSketchToolbar:
 
 
 Gui.addWorkbenchManipulator(_AddToSketchToolbar())
+
+
+from .ks_prefs import KSprefsPage  # noqa: E402
+
+Gui.addIconPath(ICONS)  # for the preferences page icon, preferences-kle_plate_generator.svg
+Gui.addPreferencePage(KSprefsPage, "KLE Plate Generator")
 
 
 # class KLE2FreeCADWorkbench(Gui.Workbench):
