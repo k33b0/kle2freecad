@@ -22,7 +22,9 @@ class TestCommand:
 
         from .dialog import KLEPromptDialog
         from .kle_json_cleaner import countKeys
-        from .ks_draw import CutoutCollector, addCutouts, drawCherryKey, drawCherryStab, findKeyCenters
+        from .ks_draw import CutoutCollector, addCutouts, findKeyCenters
+        from .ks_stab import drawCherryStab
+        from .ks_switch import drawCherryKey
 
         dlg = KLEPromptDialog(Gui.getMainWindow())
         if not dlg.exec():
