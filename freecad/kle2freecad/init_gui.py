@@ -23,8 +23,8 @@ class TestCommand:
         from .dialog import KLEPromptDialog
         from .kle_json_cleaner import countKeys
         from .ks_draw import CutoutCollector, addCutouts, findKeyCenters
-        from .ks_stab import drawCherryStab
-        from .ks_switch import drawCherryKey
+        from .stb_chrry_mx import drawCherryStab
+        from .swt_chrry_mx import drawCherryKey
 
         dlg = KLEPromptDialog(Gui.getMainWindow())
         if not dlg.exec():
@@ -35,6 +35,8 @@ class TestCommand:
         adv_k = dlg.adv_k.value() # Kerf
         flt_r = dlg.fillet_rad.value() # Switch fillet radius
         flt_c = dlg.fillet_cut.value() # Stab fillet radius
+        draw_key = dlg.cutout_type.currentText() != "None"
+        draw_stab = dlg.cutout_stab.currentText() != "None"
         kle_parsed = findKeyCenters(dlg.kle_parsed, adv_w, adv_h)
 
         # 2. a sketch is open: append to it
@@ -91,10 +93,11 @@ class TestCommand:
                     if isinstance(item, dict):
                         cx = item.get("cx",0)
                         cy = item.get("cy",0)
-                        drawCherryKey(cutouts, cx, cy, flt_r, adv_k)
+                        if draw_key:
+                            drawCherryKey(cutouts, cx, cy, flt_r, adv_k)
                         w = item.get("w",1)
                         h = item.get("h",1)
-                        if w >= 2 or h >= 2:
+                        if draw_stab and (w >= 2 or h >= 2):
                             drawCherryStab(cutouts, cx, cy, w, h, item.get("r",0), flt_c, adv_k)
                         step += 1
                     progress.setValue(step)
@@ -116,18 +119,12 @@ class TestCommand:
 Gui.addCommand("KLE2FreeCAD", TestCommand())
 
 
-class _AddToSketchToolbar:
-    def modifyToolBars(self):
-        return [{"append": "KLE2FreeCAD", "toolBar": "Sketcher"}]
+# class _AddToSketchToolbar:
+#     def modifyToolBars(self):
+#         return [{"append": "KLE2FreeCAD", "toolBar": "Sketcher"}]
 
 
-Gui.addWorkbenchManipulator(_AddToSketchToolbar())
-
-
-# from .ks_prefs import KSprefsPage  # noqa: E402
-
-# Gui.addIconPath(ICONS)  # for the preferences page icon, preferences-kle_plate_generator.svg
-# Gui.addPreferencePage(KSprefsPage, "KLE Plate Generator")
+# Gui.addWorkbenchManipulator(_AddToSketchToolbar())
 
 
 class KLE2FreeCADWorkbench(Gui.Workbench):

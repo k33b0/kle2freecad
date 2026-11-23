@@ -52,6 +52,13 @@ class KLEPromptDialog(QtWidgets.QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        # nothing to draw when both cutout types are "None"
+        ok = buttons.button(QtWidgets.QDialogButtonBox.Ok)
+        def update_ok():
+            ok.setEnabled(not (self.cutout_type.currentText() == "None" and self.cutout_stab.currentText() == "None"))
+        self.cutout_type.currentIndexChanged.connect(update_ok)
+        self.cutout_stab.currentIndexChanged.connect(update_ok)
+
     def _build_kle_block(self):
         box = QtWidgets.QGroupBox()
         box.setTitle("KLE DATA")
@@ -81,14 +88,12 @@ class KLEPromptDialog(QtWidgets.QDialog):
 
         self.cutout_type = QtWidgets.QComboBox()
         ## TODO : Add support for other cutout types
-        self.cutout_type.addItem("Cherry MX Basic")
-        self.cutout_type.setEnabled(False)
+        self.cutout_type.addItems(["Cherry MX Basic", "None"])
         form.addRow("Switch Cutout Type", self.cutout_type)
 
         self.cutout_stab = QtWidgets.QComboBox()
         ## TODO: Add support for other cutout types, depending on selection above
-        self.cutout_stab.addItem("Cherry MX Basic")
-        self.cutout_stab.setEnabled(False)
+        self.cutout_stab.addItems(["Cherry MX Basic", "None"])
         form.addRow("Stabilizer Cutout Type", self.cutout_stab)
 
         v.addLayout(form)
