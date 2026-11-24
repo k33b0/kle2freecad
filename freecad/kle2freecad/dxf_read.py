@@ -9,7 +9,7 @@ import Part
 
 from .ks_draw import _edgeToGeometry
 
-TOL = 1e-6  # end points closer than this are one point; generator files have gaps of up to 1.6e-7 mm
+TOL = 1e-3  # end points closer than this are one point; ai03 files have gaps of up to 1.6e-7 mm, Cipulot files up to 6.6e-5 mm
 
 
 def _snapper(tol):
@@ -50,6 +50,9 @@ def edgesToLoops(edges):
     The plate frame (the outline that contains all others) is dropped, and the cutouts are
     centered on it. `skipped` is the number of edge chains that do not close."""
 
+    # drop edges that the snap would shrink to one point: two ends within TOL of one earlier point
+    # can be up to 2 * TOL apart (Cipulot files have lines of 1e-6 to 1e-4 mm)
+    edges = [e for e in edges if e.Length >= 2 * TOL]
     groups = Part.sortEdges(edges, TOL)
     boxes = [Part.Compound(g).BoundBox for g in groups]
     frame = max(range(len(groups)), key=lambda i: boxes[i].XLength * boxes[i].YLength, default=None)
