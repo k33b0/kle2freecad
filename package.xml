@@ -6,9 +6,9 @@
     <date>2026-11-22</date>
     <maintainer>SilvinoR</maintainer>
     <license file="LICENCE.md">GPL-2.0-or-later</license>
-    <url type="repository" branch="main">https://github.com/keybo-collective/kle2freecad</url>
+    <url type="repository" branch="main">https://github.com/k33b0/kle2freecad</url>
     <icon>freecad/kle2freecad/resources/icons/kle2sketch.svg</icon>
-    <freecadmin>1.0.0</freecadmin>
+    <freecadmin>1.1.0</freecadmin>
     <content>
         <workbench>
             <classname>KLE2FreeCADWorkbench</classname>
