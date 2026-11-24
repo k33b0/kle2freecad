@@ -29,9 +29,7 @@ def _snapper(tol):
 
 
 def readDxfLoops(path):
-    """Return (loops, skipped). Each loop is the sketch geometry of one closed cutout outline.
-    The plate frame (the outline that contains all others) is dropped, and the cutouts are
-    centered on it. `skipped` is the number of edge chains that do not close."""
+    """Read a plate DXF and return edgesToLoops() of its edges."""
 
     active = FreeCAD.ActiveDocument
     tmp = FreeCAD.newDocument("kle2freecad_dxf", hidden=True, temp=True)
@@ -44,6 +42,13 @@ def readDxfLoops(path):
         FreeCAD.closeDocument(tmp.Name)
         if active:
             FreeCAD.setActiveDocument(active.Name)
+    return edgesToLoops(edges)
+
+
+def edgesToLoops(edges):
+    """Return (loops, skipped). Each loop is the sketch geometry of one closed cutout outline.
+    The plate frame (the outline that contains all others) is dropped, and the cutouts are
+    centered on it. `skipped` is the number of edge chains that do not close."""
 
     groups = Part.sortEdges(edges, TOL)
     boxes = [Part.Compound(g).BoundBox for g in groups]

@@ -132,8 +132,8 @@ class DxfCommand:
     def GetResources(self):
         return {
             "Pixmap": os.path.join(ICONS, "dxf2sketch.svg"),
-            "MenuText": "Import plate DXF",
-            "ToolTip": "Import the cutouts of a plate DXF into a sketch",
+            "MenuText": "Import plate DXF or SVG",
+            "ToolTip": "Import the cutouts of a plate DXF or SVG into a sketch",
             "CmdType": "ForEdit",  # stay active while a sketch is open, so it can append to it
         }
 
@@ -145,30 +145,35 @@ class DxfCommand:
         from .dxf_read import readDxfLoops
         from .ks_draw import addCutouts
         from .ks_prefs import get_dxf_dir, set_dxf_dir
+        from .svg_read import readSvgLoops
 
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            Gui.getMainWindow(), "Import plate DXF", get_dxf_dir(), "DXF files (*.dxf)"
+            Gui.getMainWindow(), "Import plate DXF or SVG", get_dxf_dir(), "Plate files (*.dxf *.svg)"
         )
         if not path:
             return  # Cancel
         set_dxf_dir(os.path.dirname(path))
+        read = {".dxf": readDxfLoops, ".svg": readSvgLoops}.get(os.path.splitext(path)[1].lower())
+        if read is None:
+            QtWidgets.QMessageBox.warning(Gui.getMainWindow(), "Import plate DXF or SVG", f"Not a .dxf or .svg file: {path}")
+            return
 
         doc, sketch, body_face = _findTarget()
         in_edit = sketch is not None
 
         try:
-            loops, skipped = readDxfLoops(path)
+            loops, skipped = read(path)
         except Exception as e:
             traceback.print_exc()
-            QtWidgets.QMessageBox.critical(Gui.getMainWindow(), "Import plate DXF", f"Cannot read {path}:\n{e}")
+            QtWidgets.QMessageBox.critical(Gui.getMainWindow(), "Import plate DXF or SVG", f"Cannot read {path}:\n{e}")
             return
         if skipped:
-            App.Console.PrintWarning(f"Import plate DXF: skipped {skipped} edge chains that do not close\n")
+            App.Console.PrintWarning(f"Import plate DXF or SVG: skipped {skipped} edge chains that do not close\n")
         if not loops:
-            QtWidgets.QMessageBox.warning(Gui.getMainWindow(), "Import plate DXF", f"No closed cutouts in {path}")
+            QtWidgets.QMessageBox.warning(Gui.getMainWindow(), "Import plate DXF or SVG", f"No closed cutouts in {path}")
             return
 
-        doc.openTransaction("Import plate DXF")
+        doc.openTransaction("Import plate DXF or SVG")
         try:
             if not in_edit:
                 sketch = _newSketch(doc, body_face)
@@ -176,7 +181,7 @@ class DxfCommand:
         except Exception as e:
             doc.abortTransaction()
             traceback.print_exc()
-            QtWidgets.QMessageBox.critical(Gui.getMainWindow(), "Import plate DXF", str(e))
+            QtWidgets.QMessageBox.critical(Gui.getMainWindow(), "Import plate DXF or SVG", str(e))
             return
         doc.commitTransaction()
         doc.recompute()
