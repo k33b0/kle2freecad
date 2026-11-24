@@ -1,56 +1,64 @@
 <p align="center">
-  <img src="Icons/kle2sketch.svg" />
+  <img src="freecad/kle2freecad/resources/icons/kle2sketch.svg" width="96" height="96" />
 </p>
 
-# KLE Plate Generator
+# KLE Plate Generator for FreeCAD
 
-Convert your KeyboardLayoutEditor.com layout to a FreeCAD sketch.
+Convert your Keyboard-Layout-Editor.com (KLE) layout to a FreeCAD sketch.
 
 ## Key Notes
 
-- This is currently under development and for now works in a very basic manner. Several features can / should be added - but for now I have no time to dedicate to  this. Helpers are welcome.
+- This add-on is under development and works in a basic way. Several features can be added, but I have no time for them now. Helpers are welcome.
 
 ## How to Install
 
-Clone this repo into your FreeCAD `Mod` folder.
+Clone this repo into the `Mod` folder of your FreeCAD user folder. FreeCAD 1.1 has a user folder for each version, for example `v1-1`.
 
-- On Linux it is usually `/home/username/.local/share/FreeCAD/Mod/`
-- On Windows it is `%APPDATA%\FreeCAD\Mod\`, which is usually `C:\Users\your_user_name\Appdata\Roaming\FreeCAD\Mod\`
-- On macOS it is usually `/Users/username/Library/Application Support/FreeCAD/Mod/`.
-- *(You can confirm find the folder by typing `App.getUserAppDataDir()` in the Python console.)*
+- On Linux it is usually `/home/username/.local/share/FreeCAD/v1-1/Mod/`
+- On Windows it is `%APPDATA%\FreeCAD\v1-1\Mod\`, which is usually `C:\Users\your_user_name\AppData\Roaming\FreeCAD\v1-1\Mod\`
+- On macOS it is usually `/Users/username/Library/Application Support/FreeCAD/v1-1/Mod/`
+- *(To find the user folder, type `App.getUserAppDataDir()` in the Python console. If the `Mod` folder does not exist, make it.)*
 
-In that folder type:
+In the `Mod` folder, type:
 
 ```sh
-git clone https://github.com/keybo-collective/kle2freecad
+git clone https://github.com/k33b0/kle2freecad
 ```
 
 ## How to Use
 
-*(This section will be expanded later, but for now...)*
+*(I will expand this section later.)*
 
-- Once you restart FreeCAD you should be able to see a Workbench called **KLE Plate Generator**, select this.
-- Once the **KLE Plate Generator** Workbench is selected you should see a **KLE Sketch Generator** button.
-    ![](docs/screenshot1.jpg)
-- Pressing this will evoke the generator UI prompting you for your KLE "raw" data.
-    ![](docs/screenshot2.jpg)
-- Output from this screen will be a generated sketch of the plate.
+- Restart FreeCAD, then select the **KLE Plate Generator** workbench.
+- The workbench has two buttons: **Plate cutouts** and **Import plate DXF or SVG**.
+- **Plate cutouts** opens the generator dialog, which asks for your KLE "raw" data.
+- **Import plate DXF or SVG** opens a file dialog. Select a DXF or SVG file from a plate generator.
+- Both buttons make a sketch of the plate cutouts.
 
 ## Current Limits
 
+### KLE to sketch
+
 - Only generates simple Cherry MX Basic key footprints.
 - Only generates simple Cherry MX Basic stab cutouts (PCB mount).
+
+### DXF and SVG import
+
+- Tested only with files from the [ai03 Plate Generator](https://kbplate.ai03.com) (Cherry MX and EC cutouts). Files from other generators have not been tested.
+- The import uses the outer frame of the plate to center the cutouts. Without a frame, it centers on the cutouts.
+- DXF files are tested only with lines, arcs, and circles.
+- SVG files can use only `<path>` (commands M, L, H, V, A, Z) and `<circle>`. Transforms, curves, and elliptical arcs are not supported.
+- The inside corners of merged cutouts get a fixed radius of 0.5 mm.
+- Kerf comes from the generator. The import does not add kerf.
 
 ## Next?
 
 - Further develop the generator to make other key and stab footprints.
 - Further develop the generator with features such as key rotation.
-- Add acoustic cutout capabilities.
-- Add variable kerf settings.
 
-> When? 🤷‍♂️ .. no time ... so will depend on other's help.
+> When? I have no time for now, so it depends on help from others.
 
 ## Support
 
 - None
-- ... but if you're good at coding *(or **really good** at driving Ai)* then start with the PR, or ping me on the Atelier discord.
+- ... but if you are good at coding *(or **really good** at driving AI)*, start with a PR.
