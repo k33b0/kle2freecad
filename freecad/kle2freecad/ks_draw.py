@@ -154,13 +154,16 @@ class CutoutCollector:
 
 # ----------------------------------------------------------------------------
 
-def _edgeToGeometry(edge):
-    """Turn a line or arc edge of a merged outline back into sketch geometry."""
+def _edgeToGeometry(edge, snap=lambda p: p):
+    """Turn a line, arc or circle edge back into sketch geometry. `snap` maps each end point,
+    so that ends that nearly meet become one point."""
     if isinstance(edge.Curve, Part.Line):
-        return Part.LineSegment(edge.Vertexes[0].Point, edge.Vertexes[-1].Point)
-    p1 = edge.valueAt(edge.FirstParameter)
+        return Part.LineSegment(snap(edge.Vertexes[0].Point), snap(edge.Vertexes[-1].Point))
+    if edge.isClosed():  # a full circle: its start and end are the same point
+        return Part.Circle(edge.Curve.Center, FreeCAD.Vector(0, 0, 1), edge.Curve.Radius)
+    p1 = snap(edge.valueAt(edge.FirstParameter))
     pm = edge.valueAt((edge.FirstParameter + edge.LastParameter) / 2)
-    p2 = edge.valueAt(edge.LastParameter)
+    p2 = snap(edge.valueAt(edge.LastParameter))
     arc = Part.ArcOfCircle(p1, pm, p2)
     if arc.Axis.z < 0:  # sketch arcs run counterclockwise
         arc = Part.ArcOfCircle(p2, pm, p1)
@@ -207,7 +210,8 @@ def addCutouts(sketch, loops, radius=0, construction=()):
                 # round the inside corners: grow by radius, then shrink back (a 2D closing);
                 # the outside corners keep their shape
                 merged = Part.Compound(merged.Faces).makeOffset2D(radius, join=0).makeOffset2D(-radius, join=0)
-            geoms += [_edgeToGeometry(e) for e in merged.Edges]
+            # drop slivers: the rounding can leave an arc of about 1e-7 mm where a line meets an arc
+            geoms += [_edgeToGeometry(e) for e in merged.Edges if e.Length >= 1e-6]
 
     single = {members[0] for members in groups.values() if len(members) == 1}
     construction_geoms = [g for i, gs in construction if i in single for g in gs]
