@@ -20,3 +20,12 @@ def set_saved_layout(text: str) -> None:
     """Persist layout text."""
     _pref_group().SetString(_PREF_KEY, text or "")
 
+
+def get_dxf_dir():
+    """Return the folder of the last imported DXF, or an empty string."""
+    return _pref_group().GetString("LastDxfDir")
+
+
+def set_dxf_dir(path: str) -> None:
+    """Remember the folder of the last imported DXF."""
+    _pref_group().SetString("LastDxfDir", path)

@@ -19,6 +19,10 @@ def drawCherryStab(sketch, cx, cy, width, height, angle, flt_r, kerf):
         o_o = 50.0
     elif z >= 6:
         o_o = 47.63
+    elif z >= 4.5:  # JIS / JLA-450
+        o_o = 35.0
+    elif z >= 4.25:  # JIS / JLA-425
+        o_o = 30.0
     elif z >= 3:
         o_o = 19.05
     elif z >= 2:

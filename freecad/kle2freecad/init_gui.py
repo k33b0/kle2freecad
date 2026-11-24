@@ -6,6 +6,43 @@ import FreeCADGui as Gui
 ICONS = os.path.join(os.path.dirname(__file__), "resources", "icons")
 
 
+def _findTarget():
+    """Return where new cutouts go: (document, open sketch or None, (body, object, face name) or None).
+    2. a sketch is open: append to it
+    1. one flat face of a Body is selected: a new sketch in that Body, attached to the face
+    3. anything else: a new sketch"""
+
+    vp = Gui.ActiveDocument and Gui.ActiveDocument.getInEdit()
+    sketch = vp.Object if vp and vp.Object.TypeId == "Sketcher::SketchObject" else None
+    if sketch:
+        return sketch.Document, sketch, None
+
+    faces = [
+        (sel.Object, name)
+        for sel in Gui.Selection.getSelectionEx()
+        for name in sel.SubElementNames
+        if name.startswith("Face")
+    ]
+    if len(faces) == 1:
+        obj, name = faces[0]
+        body = obj.getParentGeoFeatureGroup()
+        if body and body.isDerivedFrom("PartDesign::Body") and obj.getSubObject(name).findPlane() is not None:
+            return obj.Document, None, (body, obj, name)
+
+    return App.ActiveDocument or App.newDocument(), None, None
+
+
+def _newSketch(doc, body_face):
+    """Make the new sketch for _findTarget scenarios 1 and 3."""
+    if body_face:
+        body, obj, name = body_face
+        sketch = body.newObject("Sketcher::SketchObject", "Sketch")
+        sketch.AttachmentSupport = [(obj, name)]
+        sketch.MapMode = "FlatFace"
+        return sketch
+    return doc.addObject("Sketcher::SketchObject", "Sketch")
+
+
 class TestCommand:
     def GetResources(self):
         return {
@@ -39,42 +76,12 @@ class TestCommand:
         draw_stab = dlg.cutout_stab.currentText() != "None"
         kle_parsed = findKeyCenters(dlg.kle_parsed, adv_w, adv_h)
 
-        # 2. a sketch is open: append to it
-        vp = Gui.ActiveDocument and Gui.ActiveDocument.getInEdit()
-        sketch = vp.Object if vp and vp.Object.TypeId == "Sketcher::SketchObject" else None
+        doc, sketch, body_face = _findTarget()
         in_edit = sketch is not None
 
-        # 1. one flat face of a Body is selected: new sketch in that Body, attached to the face
-        body_face = None
-        if not in_edit:
-            faces = [
-                (sel.Object, name)
-                for sel in Gui.Selection.getSelectionEx()
-                for name in sel.SubElementNames
-                if name.startswith("Face")
-            ]
-            if len(faces) == 1:
-                obj, name = faces[0]
-                body = obj.getParentGeoFeatureGroup()
-                if body and body.isDerivedFrom("PartDesign::Body") and obj.getSubObject(name).findPlane() is not None:
-                    body_face = (body, obj, name)
-
-        if in_edit:
-            doc = sketch.Document
-        elif body_face:
-            doc = body_face[1].Document
-        else:
-            doc = App.ActiveDocument or App.newDocument()
-
         doc.openTransaction("Draw square")
-        if body_face:
-            body, obj, name = body_face
-            sketch = body.newObject("Sketcher::SketchObject", "Sketch")
-            sketch.AttachmentSupport = [(obj, name)]
-            sketch.MapMode = "FlatFace"
-        elif not in_edit:
-            # 3. anything else: a new sketch, as before
-            sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
+        if not in_edit:
+            sketch = _newSketch(doc, body_face)
         # loop here
         progress = QtWidgets.QProgressDialog("Drawing key cutouts...", None, 0, countKeys(kle_parsed), Gui.getMainWindow())
         progress.setWindowTitle("KLE Sketch Generator")
@@ -119,6 +126,73 @@ class TestCommand:
 Gui.addCommand("KLE2FreeCAD", TestCommand())
 
 
+class DxfCommand:
+    INSIDE_RADIUS = 0.5  # inside corners of merged cutouts; the dialog's default fillet radius
+
+    def GetResources(self):
+        return {
+            "Pixmap": os.path.join(ICONS, "dxf2sketch.svg"),
+            "MenuText": "Import plate DXF or SVG",
+            "ToolTip": "Import the cutouts of a plate DXF or SVG into a sketch",
+            "CmdType": "ForEdit",  # stay active while a sketch is open, so it can append to it
+        }
+
+    def Activated(self):
+        import traceback
+
+        from PySide import QtWidgets
+
+        from .dxf_read import readDxfLoops
+        from .ks_draw import addCutouts
+        from .ks_prefs import get_dxf_dir, set_dxf_dir
+        from .svg_read import readSvgLoops
+
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            Gui.getMainWindow(), "Import plate DXF or SVG", get_dxf_dir(), "Plate files (*.dxf *.svg)"
+        )
+        if not path:
+            return  # Cancel
+        set_dxf_dir(os.path.dirname(path))
+        read = {".dxf": readDxfLoops, ".svg": readSvgLoops}.get(os.path.splitext(path)[1].lower())
+        if read is None:
+            QtWidgets.QMessageBox.warning(Gui.getMainWindow(), "Import plate DXF or SVG", f"Not a .dxf or .svg file: {path}")
+            return
+
+        doc, sketch, body_face = _findTarget()
+        in_edit = sketch is not None
+
+        try:
+            loops, skipped = read(path)
+        except Exception as e:
+            traceback.print_exc()
+            QtWidgets.QMessageBox.critical(Gui.getMainWindow(), "Import plate DXF or SVG", f"Cannot read {path}:\n{e}")
+            return
+        if skipped:
+            App.Console.PrintWarning(f"Import plate DXF or SVG: skipped {skipped} edge chains that do not close\n")
+        if not loops:
+            QtWidgets.QMessageBox.warning(Gui.getMainWindow(), "Import plate DXF or SVG", f"No closed cutouts in {path}")
+            return
+
+        doc.openTransaction("Import plate DXF or SVG")
+        try:
+            if not in_edit:
+                sketch = _newSketch(doc, body_face)
+            addCutouts(sketch, loops, self.INSIDE_RADIUS)
+        except Exception as e:
+            doc.abortTransaction()
+            traceback.print_exc()
+            QtWidgets.QMessageBox.critical(Gui.getMainWindow(), "Import plate DXF or SVG", str(e))
+            return
+        doc.commitTransaction()
+        doc.recompute()
+
+        if not in_edit:
+            Gui.getDocument(doc.Name).setEdit(sketch.Name)
+
+
+Gui.addCommand("DXF2FreeCAD", DxfCommand())
+
+
 # class _AddToSketchToolbar:
 #     def modifyToolBars(self):
 #         return [{"append": "KLE2FreeCAD", "toolBar": "Sketcher"}]
@@ -134,8 +208,8 @@ class KLE2FreeCADWorkbench(Gui.Workbench):
 
     def Initialize(self):
         Gui.addIconPath(ICONS)
-        self.appendToolbar("KLE Plate Generator", ["KLE2FreeCAD"])
-        self.appendMenu("KLE Plate Generator", ["KLE2FreeCAD"])
+        self.appendToolbar("KLE Plate Generator", ["KLE2FreeCAD", "DXF2FreeCAD"])
+        self.appendMenu("KLE Plate Generator", ["KLE2FreeCAD", "DXF2FreeCAD"])
 
     def GetClassName(self):
         return "Gui::PythonWorkbench"
