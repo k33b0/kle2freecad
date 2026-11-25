@@ -135,18 +135,15 @@ def drawCenter(sketch, cx, cy):
 # ----------------------------------------------------------------------------
 
 class CutoutCollector:
-    """Stand-in for a sketch: drawRect adds each cutout here as one closed loop, so
-    overlapping cutouts can be merged before they go into the real sketch."""
+    """Stand-in for a sketch: the draw functions add their geometry here, so that
+    addCutouts puts all of it into the real sketch with one call."""
 
     def __init__(self):
         self.loops = []
-        self.construction = []  # (index of the loop it belongs to, geometry)
+        self.construction = []
 
     def addGeometry(self, geoms, construction=False):
-        if construction:
-            self.construction.append((len(self.loops) - 1, list(geoms)))
-        else:
-            self.loops.append(list(geoms))
+        (self.construction if construction else self.loops).append(list(geoms))
         return list(range(len(geoms)))
 
     def addConstraint(self, constraints):
@@ -171,52 +168,12 @@ def _edgeToGeometry(edge, snap=lambda p: p):
 
 # ----------------------------------------------------------------------------
 
-def addCutouts(sketch, loops, radius=0, construction=()):
-    """Add the cutout loops to the sketch, each item frozen with a Block constraint.
-    Loops that overlap or touch, such as the alternative keys of a multi-layout plate
-    (a split Backspace on top of a 2u Backspace), are merged into one outline. If
-    `radius` is not 0, the inside corners of a merged outline are rounded to it.
-    `construction` holds (loop index, geometry) pairs from CutoutCollector; they are added as
-    construction geometry, but only for loops that were not merged."""
+def addCutouts(sketch, loops, construction=()):
+    """Add the cutout loops, and the construction geometry from CutoutCollector, to the
+    sketch. Each item is frozen with a Block constraint."""
 
-    faces = [Part.Face(Part.Wire(Part.__sortEdges__([g.toShape() for g in loop]))) for loop in loops]
-
-    # group the loops that overlap or touch
-    # ponytail: pair scan is O(n^2) with a bounding-box filter; fine for keyboards, use a spatial grid if layouts get much larger
-    parent = list(range(len(faces)))
-
-    def find(i):
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
-
-    for i in range(len(faces)):
-        for j in range(i + 1, len(faces)):
-            if faces[i].BoundBox.intersect(faces[j].BoundBox) and faces[i].distToShape(faces[j])[0] < 1e-7:
-                parent[find(i)] = find(j)
-
-    groups = {}
-    for i in range(len(faces)):
-        groups.setdefault(find(i), []).append(i)
-
-    geoms = []
-    for members in groups.values():
-        if len(members) == 1:
-            geoms += loops[members[0]]
-        else:
-            merged = faces[members[0]].fuse([faces[m] for m in members[1:]]).removeSplitter()
-            if radius > 0:
-                # round the inside corners: grow by radius, then shrink back (a 2D closing);
-                # the outside corners keep their shape
-                merged = Part.Compound(merged.Faces).makeOffset2D(radius, join=0).makeOffset2D(-radius, join=0)
-            # drop slivers: the rounding can leave an arc of about 1e-7 mm where a line meets an arc
-            geoms += [_edgeToGeometry(e) for e in merged.Edges if e.Length >= 1e-6]
-
-    single = {members[0] for members in groups.values() if len(members) == 1}
-    construction_geoms = [g for i, gs in construction if i in single for g in gs]
-
-    ids = list(sketch.addGeometry(geoms, False))
+    ids = list(sketch.addGeometry([g for loop in loops for g in loop], False))
+    construction_geoms = [g for gs in construction for g in gs]
     if construction_geoms:
         ids += list(sketch.addGeometry(construction_geoms, True))
     sketch.addConstraint([Sketcher.Constraint('Block', i) for i in ids])

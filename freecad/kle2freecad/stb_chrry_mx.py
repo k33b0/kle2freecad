@@ -93,33 +93,31 @@ def drawStabPad(sketch, x, y, w, h, r, k, shift=3.0, kerf=0):
         s = start + k * math.pi / 2
         return Part.ArcOfCircle(Part.Circle(P(acx, acy), FreeCAD.Vector(0, 0, 1), r), s, s + math.pi / 2)
 
-    real = [
-        line(-a + r, -t, a - r, -t),  # bottom
-        line(a, -t + r, a, -t + shift + r),    # right side, this pad only
-        line(a, -t + shift + r, a, t - r),     # right side, common to both pads
-        line(a - r, t, -a + r, t),             # top, inside the opposite pad
-        line(-a, t - r, -a, -t + shift + r),   # left side, common to both pads
-        line(-a, -t + shift + r, -a, -t + r),  # left side, this pad only
-    ]
-    construction = [
-        line(a, t - r, a, t + shift - r),           # right side extension
-        line(-a, t - r, -a, t + shift - r),         # left side extension
-        line(a - r, t + shift, -a + r, t + shift),  # opposite pad top
-        line(-a + r, -t + shift, a - r, -t + shift),  # opposite pad bottom, a reference only
-    ]
-    if r > 0:
-        real += [
-            arc(a - r, -t + r, 1.5 * math.pi),  # bottom right
-            arc(a - r, t - r, 0),               # top right
-            arc(-a + r, t - r, 0.5 * math.pi),  # top left
-            arc(-a + r, -t + r, math.pi),       # bottom left
-        ]
-        construction += [
-            arc(a - r, t + shift - r, 0),               # opposite pad top right
-            arc(-a + r, t + shift - r, 0.5 * math.pi),  # opposite pad top left
-            arc(-a + r, -t + shift + r, math.pi),       # opposite pad bottom left, a reference only
-            arc(a - r, -t + shift + r, 1.5 * math.pi),  # opposite pad bottom right, a reference only
-        ]
+    # clockwise, like drawRect: top, right side down, bottom, left side up, each corner after its side
+    # (sketch arcs always run counterclockwise; only their place in the order follows the outline)
+    corner = (lambda acx, acy, start: [arc(acx, acy, start)]) if r > 0 else (lambda *_: [])
+    real = (
+        [line(-a + r, t, a - r, t)]                # top, inside the opposite pad
+        + corner(a - r, t - r, 0)                  # top right
+        + [line(a, t - r, a, -t + shift + r),      # right side, common to both pads
+           line(a, -t + shift + r, a, -t + r)]     # right side, this pad only
+        + corner(a - r, -t + r, 1.5 * math.pi)     # bottom right
+        + [line(a - r, -t, -a + r, -t)]            # bottom
+        + corner(-a + r, -t + r, math.pi)          # bottom left
+        + [line(-a, -t + r, -a, -t + shift + r),   # left side, this pad only
+           line(-a, -t + shift + r, -a, t - r)]    # left side, common to both pads
+        + corner(-a + r, t - r, 0.5 * math.pi)     # top left
+    )
+    construction = (
+        [line(-a + r, t + shift, a - r, t + shift)]   # opposite pad top
+        + corner(a - r, t + shift - r, 0)             # opposite pad top right
+        + [line(a, t + shift - r, a, t - r)]          # right side extension
+        + corner(a - r, -t + shift + r, 1.5 * math.pi)  # opposite pad bottom right, a reference only
+        + [line(a - r, -t + shift, -a + r, -t + shift)]  # opposite pad bottom, a reference only
+        + corner(-a + r, -t + shift + r, math.pi)     # opposite pad bottom left, a reference only
+        + [line(-a, t - r, -a, t + shift - r)]        # left side extension
+        + corner(-a + r, t + shift - r, 0.5 * math.pi)  # opposite pad top left
+    )
 
     ids = list(sketch.addGeometry(real, False)) + list(sketch.addGeometry(construction, True))
     sketch.addConstraint([Sketcher.Constraint('Block', i) for i in ids])

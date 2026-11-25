@@ -91,7 +91,7 @@ class TestCommand:
         progress.forceShow()
 
         try:
-            cutouts = CutoutCollector()  # collect first, so overlapping cutouts can be merged
+            cutouts = CutoutCollector()  # collect first, so all geometry goes into the sketch with one call
             step = 0
             for row in kle_parsed or []:
                 if not isinstance(row, list):
@@ -109,7 +109,7 @@ class TestCommand:
                         step += 1
                     progress.setValue(step)
                     QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
-            addCutouts(sketch, cutouts.loops, max(flt_r, flt_c) + adv_k / 2, cutouts.construction)  # inside corners: the larger radius, so every part fits; + kerf/2, as the beam shrinks inside corners by that much
+            addCutouts(sketch, cutouts.loops, cutouts.construction)
         except Exception as e:
             print(str(e))
             traceback.print_exc()
@@ -127,8 +127,6 @@ Gui.addCommand("KLE2FreeCAD", TestCommand())
 
 
 class DxfCommand:
-    INSIDE_RADIUS = 0.5  # inside corners of merged cutouts; the dialog's default fillet radius
-
     def GetResources(self):
         return {
             "Pixmap": os.path.join(ICONS, "dxf2sketch.svg"),
@@ -177,7 +175,7 @@ class DxfCommand:
         try:
             if not in_edit:
                 sketch = _newSketch(doc, body_face)
-            addCutouts(sketch, loops, self.INSIDE_RADIUS)
+            addCutouts(sketch, loops)
         except Exception as e:
             doc.abortTransaction()
             traceback.print_exc()

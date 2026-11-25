@@ -48,7 +48,6 @@ git clone https://github.com/k33b0/kle2freecad
 - The import uses the outer frame of the plate to center the cutouts. Without a frame, it centers on the cutouts.
 - DXF files are tested only with lines, arcs, and circles.
 - SVG files can use only `<path>` (commands M, L, H, V, A, Z) and `<circle>`. Transforms, curves, and elliptical arcs are not supported.
-- The inside corners of merged cutouts get a fixed radius of 0.5 mm.
 - Kerf comes from the generator. The import does not add kerf.
 
 ## Next?
